@@ -63,3 +63,46 @@ def test_invalid_timeout_stops_before_setup(command, monkeypatch, capsys):
     assert "--test-timeout должен быть положительным" in capsys.readouterr().err
     configure.assert_not_called()
     runner.assert_not_called()
+
+
+def test_default_settings_use_current_project_and_python(
+    command, monkeypatch, tmp_path,
+):
+    configure, runner = command
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(sys, "argv", ["main.py", "check", "--only", "tests"])
+
+    assert cli.main() == 0
+
+    configure.assert_called_once_with(None)
+    runner.assert_called_once_with(tmp_path, Path(sys.executable), 300)
+
+
+@pytest.mark.parametrize("arguments", [
+    ["--help"],
+    ["check", "--help"],
+])
+def test_help_finishes_without_setup(command, monkeypatch, capsys, arguments):
+    configure, runner = command
+    monkeypatch.setattr(sys, "argv", ["main.py", *arguments])
+
+    with pytest.raises(SystemExit) as error:
+        cli.main()
+
+    assert error.value.code == 0
+    assert "--help" in capsys.readouterr().out
+    configure.assert_not_called()
+    runner.assert_not_called()
+
+
+def test_unexpected_error_reaches_caller(command, caplog):
+    _, runner = command
+    failure = RuntimeError("Сбой реализации шага")
+    runner.side_effect = failure
+
+    with caplog.at_level(logging.INFO), pytest.raises(RuntimeError) as error:
+        cli.main()
+
+    assert error.value is failure
+    assert "Тесты прошли" not in caplog.text
+    assert sum(str(failure) in message for message in caplog.messages) == 1

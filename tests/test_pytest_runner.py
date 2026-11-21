@@ -49,3 +49,29 @@ def test_process_errors_keep_original_cause(tmp_path, cause, message):
         with pytest.raises(CheckError, match=message) as error:
             run_tests(tmp_path, Path("python"), 10)
     assert error.value.__cause__ is cause
+
+
+def test_interpreter_symlink_is_preserved(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    target = tmp_path / "system-python"
+    target.touch()
+    interpreter = Path(".venv/bin/python")
+    interpreter.parent.mkdir(parents=True)
+    interpreter.symlink_to(target)
+
+    with patch("pytest_runner.subprocess.run") as launch:
+        launch.return_value.returncode = 0
+        run_tests(tmp_path, interpreter, 10)
+
+    assert launch.call_args.args[0][0] == str(tmp_path / interpreter)
+
+
+def test_regular_file_cannot_be_project(tmp_path):
+    project = tmp_path / "project.py"
+    project.touch()
+
+    with patch("pytest_runner.subprocess.run") as launch:
+        with pytest.raises(CheckError, match="Каталог проекта не найден"):
+            run_tests(project, Path("python"), 10)
+
+    launch.assert_not_called()
