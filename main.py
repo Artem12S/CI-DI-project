@@ -2,10 +2,11 @@ import argparse
 import logging
 from pathlib import Path
 import sys
-from time import monotonic
 
+from errors import ProjectToolError
 from log import configure_log
-from pytest_runner import CheckError, run_tests
+from pipeline import run_step
+from pytest_runner import run_tests
 
 
 def main() -> int:
@@ -13,7 +14,8 @@ def main() -> int:
 
     Returns:
         0 при успехе, 1 при ошибке журнала или проверки, 130 при прерывании
-        вызова run_tests пользователем.
+        выполнения шага пользователем. Ожидаемые ошибки шагов должны
+        наследоваться от ProjectToolError.
 
     Raises:
         SystemExit: argparse завершает разбор с кодом 2 при ошибке аргументов
@@ -43,18 +45,15 @@ def main() -> int:
 
     logger = logging.getLogger(__name__)
     logger.info("Журнал: %s", log_path)
-    logger.info("Запуск pytest в %s", args.project)
-    start = monotonic()
+    logger.info("Проект: %s", args.project)
     try:
-        run_tests(args.project, args.python, args.test_timeout)
-    except CheckError as exc:
-        logger.error("Проверка остановлена через %.1f с: %s",
-                     monotonic() - start, exc)
+        run_step("pytest", run_tests,
+                 args.project, args.python, args.test_timeout)
+    except ProjectToolError:
         return 1
     except KeyboardInterrupt:
-        logger.warning("Проверка прервана пользователем")
         return 130
-    logger.info("Тесты прошли за %.1f с", monotonic() - start)
+    logger.info("Тесты прошли")
     return 0
 
 

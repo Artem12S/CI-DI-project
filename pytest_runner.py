@@ -1,8 +1,10 @@
 from pathlib import Path
 import subprocess
 
+from errors import ProjectToolError
 
-class CheckError(Exception):
+
+class CheckError(ProjectToolError):
     """Ошибка запуска pytest или неуспешный результат проверки."""
 
 

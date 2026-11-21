@@ -6,6 +6,7 @@ from unittest.mock import Mock
 import pytest
 
 import main as cli
+from errors import ProjectToolError
 from pytest_runner import CheckError
 
 
@@ -34,6 +35,7 @@ def test_success_forwards_arguments(command, caplog):
 
 @pytest.mark.parametrize(("error", "code", "message"), [
     (CheckError("Тесты не найдены"), 1, "Тесты не найдены"),
+    (ProjectToolError("Ошибка другого модуля"), 1, "Ошибка другого модуля"),
     (KeyboardInterrupt(), 130, "Проверка прервана пользователем"),
 ])
 def test_runner_failure_is_reported(command, caplog, error, code, message):
@@ -41,6 +43,7 @@ def test_runner_failure_is_reported(command, caplog, error, code, message):
     runner.side_effect = error
     assert cli.main() == code
     assert message in caplog.text
+    assert sum(message in record.message for record in caplog.records) == 1
 
 
 def test_log_error_stops_check(command, capsys):
