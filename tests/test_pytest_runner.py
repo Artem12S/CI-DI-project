@@ -18,7 +18,9 @@ def test_runs_selected_interpreter_in_project(tmp_path, monkeypatch):
         assert run_tests(project, python, 15) is None
 
     launch.assert_called_once_with(
-        [str(tmp_path / python), "-m", "pytest"], cwd=project, timeout=15
+        [str(tmp_path / python), "-m", "pytest"], cwd=project, timeout=15,
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        encoding="utf-8", errors="replace",
     )
 
 
@@ -31,7 +33,7 @@ def test_missing_project_stops_before_launch(tmp_path):
 
 @pytest.mark.parametrize(("code", "message"), [
     (5, "Тесты не найдены"),
-    (1, "pytest завершился с кодом 1"),
+    (1, "Один или несколько тестов не прошли"),
 ])
 def test_unsuccessful_pytest_result(tmp_path, code, message):
     with patch("pytest_runner.subprocess.run") as launch:

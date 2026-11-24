@@ -12,6 +12,7 @@ def root_logger(monkeypatch):
     level = root.level
     # force=True закрывает прежние обработчики, в том числе обработчики pytest.
     monkeypatch.setattr(root, "handlers", [])
+    monkeypatch.setattr(logging, "raiseExceptions", logging.raiseExceptions)
     try:
         yield root
     finally:
@@ -46,3 +47,18 @@ def test_invalid_log_directory(tmp_path):
     file.touch()
     with pytest.raises(OSError):
         configure_log(file / "check.log")
+
+
+def test_traceback_is_written_only_to_file(tmp_path, root_logger, capsys):
+    path = configure_log(tmp_path / "check.log")
+    try:
+        raise ValueError("диагностика")
+    except ValueError:
+        root_logger.debug("Подробности сбоя", exc_info=True)
+    root_logger.error("Проверка остановлена")
+
+    output = capsys.readouterr().err
+    assert output == "Проверка остановлена\n"
+    journal = path.read_text(encoding="utf-8")
+    assert "Traceback" in journal
+    assert "ValueError: диагностика" in journal

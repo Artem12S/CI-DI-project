@@ -40,7 +40,7 @@ def test_failed_step_preserves_exception_and_stops_sequence(
     next_action = Mock()
     monkeypatch.setattr(pipeline, "monotonic", Mock(side_effect=[10, 13]))
 
-    with caplog.at_level(logging.INFO), pytest.raises(type(error)) as raised:
+    with caplog.at_level(logging.DEBUG), pytest.raises(type(error)) as raised:
         pipeline.run_step("Проверка", action)
         pipeline.run_step("Отправка", next_action)
 
@@ -53,6 +53,9 @@ def test_failed_step_preserves_exception_and_stops_sequence(
     if isinstance(error, KeyboardInterrupt):
         assert caplog.records[1].levelno == logging.WARNING
         assert "прервана пользователем" in caplog.records[1].message
-    else:
+    elif isinstance(error, ProjectToolError):
         assert caplog.records[1].levelno == logging.ERROR
         assert str(error) in caplog.records[1].message
+    else:
+        assert caplog.records[1].levelno == logging.DEBUG
+        assert "Ошибка шага" in caplog.records[1].message

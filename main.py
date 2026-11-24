@@ -9,13 +9,11 @@ from pipeline import run_step
 from pytest_runner import run_tests
 
 
-def main() -> int:
-    """Читает аргументы из sys.argv, открывает журнал и запускает проверку.
+def parse_arguments() -> argparse.Namespace:
+    """Читает и проверяет аргументы из sys.argv.
 
     Returns:
-        0 при успехе, 1 при ошибке журнала или проверки, 130 при прерывании
-        выполнения шага пользователем. Ожидаемые ошибки шагов должны
-        наследоваться от ProjectToolError.
+        Параметры выбранной команды.
 
     Raises:
         SystemExit: argparse завершает разбор с кодом 2 при ошибке аргументов
@@ -36,25 +34,47 @@ def main() -> int:
     args = parser.parse_args()
     if args.test_timeout <= 0:
         check.error("--test-timeout должен быть положительным")
+    return args
 
-    try:
-        log_path = configure_log(args.log_file)
-    except OSError as exc:
-        print(f"Не удалось открыть журнал: {exc}", file=sys.stderr)
-        return 1
 
+def main() -> int:
+    """Выполняет CLI и обрабатывает ошибки подготовки и проверки.
+
+    Returns:
+        0 при успехе, 1 при ошибке, 130 при прерывании пользователем.
+
+    Raises:
+        SystemExit: argparse завершает разбор с кодом 2 при ошибке аргументов
+            или с кодом 0 при запросе справки.
+    """
+    log_path = None
     logger = logging.getLogger(__name__)
-    logger.info("Журнал: %s", log_path)
-    logger.info("Проект: %s", args.project)
     try:
+        args = parse_arguments()
+        try:
+            log_path = configure_log(args.log_file)
+        except OSError as exc:
+            print(f"Не удалось открыть журнал: {exc}", file=sys.stderr)
+            return 1
+        logger.info("Журнал: %s", log_path)
+        logger.info("Проект: %s", args.project)
         run_step("pytest", run_tests,
                  args.project, args.python, args.test_timeout)
+        logger.info("Тесты прошли")
+        return 0
     except ProjectToolError:
         return 1
     except KeyboardInterrupt:
+        print("Выполнение прервано.", file=sys.stderr)
         return 130
-    logger.info("Тесты прошли")
-    return 0
+    except Exception:
+        if log_path is None:
+            print("Не удалось подготовить запуск проверки.", file=sys.stderr)
+        else:
+            logger.debug("Непредвиденная ошибка", exc_info=True)
+            print(f"Непредвиденная ошибка. Подробности в журнале: {log_path}",
+                  file=sys.stderr)
+        return 1
 
 
 if __name__ == "__main__":

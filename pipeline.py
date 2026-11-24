@@ -5,6 +5,8 @@ import logging
 from time import monotonic
 from typing import Any
 
+from errors import ProjectToolError
+
 
 def run_step(
     name: str,
@@ -39,10 +41,14 @@ def run_step(
         )
         raise
     except Exception as exc:
-        logger.error(
-            "Шаг %s завершился ошибкой через %.1f с: %s",
-            name, monotonic() - start, exc,
-        )
+        if isinstance(exc, ProjectToolError):
+            logger.error(
+                "Шаг %s завершился ошибкой через %.1f с: %s",
+                name, monotonic() - start, exc,
+            )
+        else:
+            logger.debug("Ошибка шага %s через %.1f с",
+                         name, monotonic() - start)
         raise
     logger.info("Шаг %s выполнен за %.1f с", name, monotonic() - start)
     return result

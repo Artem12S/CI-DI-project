@@ -95,14 +95,30 @@ def test_help_finishes_without_setup(command, monkeypatch, capsys, arguments):
     runner.assert_not_called()
 
 
-def test_unexpected_error_reaches_caller(command, caplog):
+def test_unexpected_error_is_reported_without_traceback(command, capsys):
     _, runner = command
     failure = RuntimeError("Сбой реализации шага")
     runner.side_effect = failure
 
-    with caplog.at_level(logging.INFO), pytest.raises(RuntimeError) as error:
-        cli.main()
+    assert cli.main() == 1
+    output = capsys.readouterr().err
+    assert "Непредвиденная ошибка" in output
+    assert "check.log" in output
+    assert str(failure) not in output
+    assert "Traceback" not in output
 
-    assert error.value is failure
-    assert "Тесты прошли" not in caplog.text
-    assert sum(str(failure) in message for message in caplog.messages) == 1
+
+@pytest.mark.parametrize("stage", ["parse_arguments", "configure_log"])
+@pytest.mark.parametrize(("error", "code", "message"), [
+    (RuntimeError("сбой подготовки"), 1, "Не удалось подготовить"),
+    (KeyboardInterrupt(), 130, "Выполнение прервано"),
+])
+def test_preparation_errors_are_handled(
+    command, monkeypatch, capsys, stage, error, code, message,
+):
+    monkeypatch.setattr(cli, stage, Mock(side_effect=error))
+    assert cli.main() == code
+    output = capsys.readouterr().err
+    assert message in output
+    assert "Traceback" not in output
+    command[1].assert_not_called()
